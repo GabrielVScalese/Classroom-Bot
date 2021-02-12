@@ -20,6 +20,7 @@ print(datetime.datetime.strptime('February 12, 2021', '%B %d, %Y').strftime('%a'
 is_connected = False
 current_song = ''
 queue = []
+news_queue = []
 songs = -1
 client = commands.Bot(command_prefix='$')  # Define the client
 
@@ -64,12 +65,18 @@ class YTDLSource(discord.PCMVolumeTransformer):
         filename = data['url'] if stream else ytdl.prepare_filename(data)
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
+class Music:
+  def __init__(self, title, duration):
+    self.title = title
+    self.duration = duration
 
 ##### Methods:
 
 ## Method for play music from Youtube
 async def play_music(ctx, search):
+    global current_song
     global is_connected
+
     query_string = urllib.parse.urlencode({
         'search_query': search
     })
@@ -81,17 +88,20 @@ async def play_music(ctx, search):
     search_results = re.findall(
         r'/watch\?v=(.{11})', htm_content.read().decode())
 
-    voiceChannel = discord.utils.get(ctx.guild.voice_channels, name='Geral')
-    if is_connected == False:
-        await voiceChannel.connect()
-
-    is_connected = True
+    channel = ctx.message.author.voice.channel
+    voiceChannel = discord.utils.get(ctx.guild.voice_channels, name=str(channel))
     voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
+
+    if voice is None:
+        await voiceChannel.connect()
+        voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
 
     player = await YTDLSource.from_url(search_results[0])
     current_song = player.title
     voice.play(player, after=lambda e: print(
         'Player error: %s' % e) if e else None)
+
+    news_queue.append(Music(player.title, player.duration))
 
     video_minutes = str(datetime.timedelta(seconds=player.duration))
     await ctx.send('**Now playing:** ' + player.title + '  [' + video_minutes + ']')
@@ -104,11 +114,17 @@ async def play_music(ctx, search):
 async def play(ctx, *, search):
     global songs
 
-    if is_connected == False:
+    author_voice = ctx.message.author.voice
+
+    if not author_voice:
+        await ctx.send('Join a channel!')
+        return
+
+    voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
+
+    if voice is None:
         await play_music(ctx, search)
     else:
-        voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
-
         if voice.is_playing():
             songs += 1
             queue.append(search)
