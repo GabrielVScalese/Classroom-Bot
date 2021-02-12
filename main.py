@@ -113,10 +113,10 @@ async def play(ctx, *, search):
 ## Show all commands
 @client.command()
 async def commands(ctx):
-    string = '```All commands:' + '\n\n' + '!play: play the music' + '\n' + '!pause: pause the music' + '\n' + '!resume: continue the music' + '\n' + \
-        '!skip: play next music in queue' + '\n' + '!leave: disconnect the bot' + '\n' + \
-        '!show_queue: show all musics in queue' + \
-        '\n\n' '!school_schedules: show school_schedules```'
+    string = '```All commands:' + '\n\n' + '$play: play the music' + '\n' + '$pause: pause the music' + '\n' + '$resume: continue the music' + '\n' + \
+        '$skip: play next music in queue' + '\n' + '$leave: disconnect the bot' + '\n' + \
+        '$show_queue: show all musics in queue' + \
+        '\n\n' '$school_schedules: show school_schedules```'
 
     await ctx.send(string)
 
