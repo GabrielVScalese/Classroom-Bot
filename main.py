@@ -1,11 +1,16 @@
 ## Libraries
 import discord
 import os
-from discord.ext import commands
+from discord.ext import commands, tasks
 import urllib.parse, urllib.request, re
 from keep_alive import keep_alive
 import youtube_dl
 import asyncio
+
+
+## Tests
+import datetime
+print(datetime.datetime.strptime('February 12, 2021', '%B %d, %Y').strftime('%a'))
 
 
 ######## Variables:
