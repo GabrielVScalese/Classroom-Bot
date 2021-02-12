@@ -10,6 +10,9 @@ import asyncio
 
 ######## Variables:
 
+is_connected = False
+queue = []
+songs = -1
 client = commands.Bot(command_prefix='!') ## Define the client
 
 ytdl_format_options = {
@@ -55,32 +58,11 @@ class YTDLSource(discord.PCMVolumeTransformer):
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 
-######## Envents:
+######## Methods:
 
-## When the client is running
-@client.event
-async def on_ready():
-  print('We have logged in as {0.user}'.format(client))
-
-## When the client receives a message
-@client.event
-async def on_message(message):
-  if message.author == client:
-    return
-
-  if message.content.startswith('$ola'):
-    await message.channel.send('Olá!')
-
-  if message.content.startswith('$entrar'):
-    canal = message.author.voice.voice_channel
-    await client.join_voice_channel(canal)
-
-
-######## Commands:
-
-## Play music from Youtube
-@client.command()
-async def play (ctx, *, search):
+## Method for play music from Youtube
+async def play_music(ctx, search):
+  global is_connected
   query_string = urllib.parse.urlencode({
     'search_query': search
   })
@@ -92,13 +74,35 @@ async def play (ctx, *, search):
   search_results = re.findall(r'/watch\?v=(.{11})', htm_content.read().decode())
 
   voiceChannel = discord.utils.get(ctx.guild.voice_channels, name='Geral')
-  await voiceChannel.connect()
+  if is_connected == False:
+    await voiceChannel.connect()
+
+  is_connected = True
   voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
   
   player = await YTDLSource.from_url(search_results[0])
   voice.play(player, after=lambda e: print('Player error: %s' % e) if e else None)
 
-  await ctx.send('http://youtube.com/watch?v=' + search_results[0])
+  await ctx.send('**Now playing:** http://youtube.com/watch?v=' + search_results[0])
+
+
+######## Commands:
+
+## Play music from Youtube
+@client.command()
+async def play (ctx, *, search):
+  global songs
+
+  if is_connected == False:
+    await play_music(ctx, search)
+  else:
+    voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
+
+    if voice.is_playing():
+      songs += 1
+      print('Adding new song')
+      queue.append(search)
+      return
 
 ## Disconnect client
 @client.command()
@@ -118,6 +122,19 @@ async def pause (ctx):
   else:
     await ctx.send('No audio is playing')
 
+@client.command()
+async def skip (ctx):
+  global songs
+
+  if len(queue) != 0:
+    voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
+    voice.pause()
+    await play_music(ctx, queue[0])
+    del queue[0]
+    songs -= 1
+  else:
+    await ctx.send('There not more musics')
+
 ## Resume the music from Youtube
 @client.command()
 async def resume (ctx):
@@ -126,6 +143,24 @@ async def resume (ctx):
      voice.resume()
    else:
     await ctx.send('The audio is not paused')
+
+## Show the queue
+
+@client.command()
+async def show_queue (ctx):
+  global queue
+  index = 1
+  string = 'Musics in queue:' + '\n' + '\n'
+
+  if len(queue) != 0:
+    for music in queue:
+      string += str(index) + ' - ' + music + '\n'
+      index += 1
+  else:
+    string = 'There not queue'
+    
+  string = '```' + string + '```'
+  await ctx.send(string)
 
 keep_alive() ## Client keep alive
 client.run(os.getenv('TOKEN')) ## Run the client
