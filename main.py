@@ -26,7 +26,7 @@ ytdl_format_options = {
     'quiet': True,
     'no_warnings': True,
     'default_search': 'auto',
-    'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
+    'source_address': '0.0.0.0'
 }
 
 ffmpeg_options = {
@@ -100,9 +100,15 @@ async def play (ctx, *, search):
 
     if voice.is_playing():
       songs += 1
-      print('Adding new song')
       queue.append(search)
       return
+
+## Show all commands
+@client.command()
+async def commands (ctx):
+  string = '```All commands:' + '\n\n' + '!play: play the music' + '\n' + '!pause: pause the music' + '\n' + '!resume: continue the music' + '\n' + '!skip: play next music in queue' + '\n' + '!leave: disconnect the bot' + '\n' + '!show_queue: show all musics in queue```'
+
+  await ctx.send(string)
 
 ## Disconnect client
 @client.command()
@@ -158,7 +164,7 @@ async def show_queue (ctx):
       index += 1
   else:
     string = 'There not queue'
-    
+
   string = '```' + string + '```'
   await ctx.send(string)
 
