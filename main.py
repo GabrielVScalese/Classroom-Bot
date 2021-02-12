@@ -18,6 +18,7 @@ print(datetime.datetime.strptime('February 12, 2021', '%B %d, %Y').strftime('%a'
 ##### Variables:
 
 is_connected = False
+current_song = ''
 queue = []
 songs = -1
 client = commands.Bot(command_prefix='$')  # Define the client
@@ -49,6 +50,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
 
         self.data = data
         self.title = data.get('title')
+        self.duration = data.get('duration')
         self.url = data.get('url')
 
     @classmethod
@@ -87,10 +89,12 @@ async def play_music(ctx, search):
     voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
 
     player = await YTDLSource.from_url(search_results[0])
+    current_song = player.title
     voice.play(player, after=lambda e: print(
         'Player error: %s' % e) if e else None)
 
-    await ctx.send('**Now playing:** http://youtube.com/watch?v=' + search_results[0])
+    video_minutes = str(datetime.timedelta(seconds=player.duration))
+    await ctx.send('**Now playing:** ' + player.title + '  [' + video_minutes + ']')
 
 
 ##### Commands:
@@ -113,10 +117,10 @@ async def play(ctx, *, search):
 ## Show all commands
 @client.command()
 async def commands(ctx):
-    string = '```All commands:' + '\n\n' + '$play: play the music' + '\n' + '$pause: pause the music' + '\n' + '$resume: continue the music' + '\n' + \
-        '$skip: play next music in queue' + '\n' + '$leave: disconnect the bot' + '\n' + \
-        '$show_queue: show all musics in queue' + \
-        '\n\n' '$school_schedules: show school_schedules```'
+    string = '```All commands:' + '\n\n-- About Music--' + '\n\n' + '$play "music": play the music' + '\n' + '$pause: pause the music' + '\n' + '$resume: continue the music' + '\n' + \
+    '$skip: play next music in queue' + '\n' + '$leave: disconnect the bot' + '\n' + \
+    '$show_queue: show all musics in queue' + '\n$now: show the current music' \
+    '\n\n' + '-- About School --' + '\n\n' + '$school_schedules: show school schedules```'
 
     await ctx.send(string)
 
@@ -177,6 +181,13 @@ async def show_queue(ctx):
 
     string = '```' + string + '```'
     await ctx.send(string)
+
+## Show the current song
+@client.command()
+async def now(ctx):
+  global current_song
+
+  await ctx.send('****Is playing:**** ' + current_song)
 
 ## Show the school schedules
 @client.command()
