@@ -13,7 +13,7 @@ import asyncio
 is_connected = False
 queue = []
 songs = -1
-client = commands.Bot(command_prefix='!') ## Define the client
+client = commands.Bot(command_prefix='$') ## Define the client
 
 ytdl_format_options = {
     'format': 'bestaudio/best',
@@ -106,7 +106,7 @@ async def play (ctx, *, search):
 ## Show all commands
 @client.command()
 async def commands (ctx):
-  string = '```All commands:' + '\n\n' + '!play: play the music' + '\n' + '!pause: pause the music' + '\n' + '!resume: continue the music' + '\n' + '!skip: play next music in queue' + '\n' + '!leave: disconnect the bot' + '\n' + '!show_queue: show all musics in queue```'
+  string = '```All commands:' + '\n\n' + '!play: play the music' + '\n' + '!pause: pause the music' + '\n' + '!resume: continue the music' + '\n' + '!skip: play next music in queue' + '\n' + '!leave: disconnect the bot' + '\n' + '!show_queue: show all musics in queue' + '\n\n' '!school_schedules: show school_schedules```'
 
   await ctx.send(string)
 
@@ -167,6 +167,10 @@ async def show_queue (ctx):
 
   string = '```' + string + '```'
   await ctx.send(string)
+
+@client.command()
+async def school_schedules(ctx):
+  await ctx.send(file=discord.File('school_schedules.png'))
 
 keep_alive() ## Client keep alive
 client.run(os.getenv('TOKEN')) ## Run the client
