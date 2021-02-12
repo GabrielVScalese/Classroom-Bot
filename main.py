@@ -1,3 +1,4 @@
+## Libraries
 import discord
 import os
 from discord.ext import commands
@@ -5,34 +6,11 @@ import urllib.parse, urllib.request, re
 from keep_alive import keep_alive
 import youtube_dl
 import asyncio
-from discord.voice_client import VoiceClient
 
-'''@client.event
-async def on_ready():
-  print('We have logged in as {0.user}'.format(client))
 
-@client.event
-async def on_message(message):
-  if message.author == client:
-    return
+######## Variables:
 
-  if message.content.startswith('$ola'):
-    await message.channel.send('Olá!')
-
-  if message.content.startswith('$entrar'):
-    canal = message.author.voice.voice_channel
-    await client.join_voice_channel(canal)
-
-  if message.content.startswith('$play'):
-    voiceChannel = discord.utils.get(ctx)'''
-
-client = commands.Bot(command_prefix='!')
-
-@client.command(pass_context=True)
-async def join(ctx):
-  channel = ctx.message.author.voice.voice_channel
-  await client.join_voice_channel(channel)
-
+client = commands.Bot(command_prefix='!') ## Define the client
 
 ytdl_format_options = {
     'format': 'bestaudio/best',
@@ -54,6 +32,7 @@ ffmpeg_options = {
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
+## Class
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
         super().__init__(source, volume)
@@ -76,8 +55,32 @@ class YTDLSource(discord.PCMVolumeTransformer):
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 
+######## Envents:
+
+## When the client is running
+@client.event
+async def on_ready():
+  print('We have logged in as {0.user}'.format(client))
+
+## When the client receives a message
+@client.event
+async def on_message(message):
+  if message.author == client:
+    return
+
+  if message.content.startswith('$ola'):
+    await message.channel.send('Olá!')
+
+  if message.content.startswith('$entrar'):
+    canal = message.author.voice.voice_channel
+    await client.join_voice_channel(canal)
+
+
+######## Commands:
+
+## Play music from Youtube
 @client.command()
-async def youtube (ctx, *, search):
+async def play (ctx, *, search):
   query_string = urllib.parse.urlencode({
     'search_query': search
   })
@@ -87,16 +90,17 @@ async def youtube (ctx, *, search):
   )
 
   search_results = re.findall(r'/watch\?v=(.{11})', htm_content.read().decode())
-  await ctx.send('http://youtube.com/watch?v=' + search_results[0])
 
   voiceChannel = discord.utils.get(ctx.guild.voice_channels, name='Geral')
   await voiceChannel.connect()
   voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
   
-  async with ctx.typing():
-    player = await YTDLSource.from_url(search_results[0])
-    voice.play(player, after=lambda e: print('Player error: %s' % e) if e else None)
+  player = await YTDLSource.from_url(search_results[0])
+  voice.play(player, after=lambda e: print('Player error: %s' % e) if e else None)
 
+  await ctx.send('http://youtube.com/watch?v=' + search_results[0])
+
+## Disconnect client
 @client.command()
 async def leave (ctx):
     voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
@@ -105,6 +109,7 @@ async def leave (ctx):
     else:
       await ctx.send('The bot is not connected to a voie channel')
 
+## Pause the music from Yotube
 @client.command()
 async def pause (ctx):
   voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
@@ -113,7 +118,7 @@ async def pause (ctx):
   else:
     await ctx.send('No audio is playing')
 
-
+## Resume the music from Youtube
 @client.command()
 async def resume (ctx):
    voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
@@ -122,6 +127,5 @@ async def resume (ctx):
    else:
     await ctx.send('The audio is not paused')
 
-
-keep_alive()
-client.run(os.getenv('TOKEN'))
+keep_alive() ## Client keep alive
+client.run(os.getenv('TOKEN')) ## Run the client
