@@ -66,17 +66,14 @@ class YTDLSource(discord.PCMVolumeTransformer):
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 class Music:
-  def __init__(self, title, duration):
+  def __init__(self, title, duration, link):
     self.title = title
     self.duration = duration
+    self.link = link
 
 ##### Methods:
 
-## Method for play music from Youtube
-async def play_music(ctx, search):
-    global current_song
-    global is_connected
-
+async def search_music (search):
     query_string = urllib.parse.urlencode({
         'search_query': search
     })
@@ -88,6 +85,24 @@ async def play_music(ctx, search):
     search_results = re.findall(
         r'/watch\?v=(.{11})', htm_content.read().decode())
 
+    return search_results[0]
+
+## Method for play music from Youtube
+async def play_music(ctx, search):
+    global current_song
+    global is_connected
+
+    '''query_string = urllib.parse.urlencode({
+        'search_query': search
+    })
+
+    htm_content = urllib.request.urlopen(
+        'http://www.youtube.com/results?' + query_string
+    )
+
+    search_results = re.findall(
+        r'/watch\?v=(.{11})', htm_content.read().decode())'''
+
     channel = ctx.message.author.voice.channel
     voiceChannel = discord.utils.get(ctx.guild.voice_channels, name=str(channel))
     voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
@@ -96,15 +111,17 @@ async def play_music(ctx, search):
         await voiceChannel.connect()
         voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
 
-    player = await YTDLSource.from_url(search_results[0])
+    '''player = await YTDLSource.from_url(search_results[0])'''
+
+    result = await search_music(search)
+    player = await YTDLSource.from_url(result)
     current_song = player.title
     voice.play(player, after=lambda e: print(
         'Player error: %s' % e) if e else None)
 
-    news_queue.append(Music(player.title, player.duration))
-
     video_minutes = str(datetime.timedelta(seconds=player.duration))
-    await ctx.send('**Now playing:** ' + player.title + '  [' + video_minutes + ']')
+    video_link = 'http://www.youtube.com/watch?v=' + result
+    await ctx.send('**Now playing:** ' + '\n' + 'Title: ' + player.title + '\n' + 'Duration: ' + video_minutes + '\n' + 'Link: ' + video_link)
 
 
 ##### Commands:
@@ -127,7 +144,9 @@ async def play(ctx, *, search):
     else:
         if voice.is_playing():
             songs += 1
-            queue.append(search)
+            result = await search_music(search)
+            player = await YTDLSource.from_url(result)
+            queue.append(Music(player.title, player.duration,  'http://www.youtube.com/watch?v=' + result))
             return
 
 ## Show all commands
@@ -190,8 +209,8 @@ async def show_queue(ctx):
 
     if len(queue) != 0:
         for music in queue:
-            string += str(index) + ' - ' + music + '\n'
-            index += 1
+            video_minutes = str(datetime.timedelta(seconds=music.duration))
+            string += 'Title: ' + music.title + '\n' + 'Duration: ' + video_minutes + '\n' + 'Link: ' + music.link + '\n' + '------------------------------------------------------------------' + '\n'
     else:
         string = 'There not queue'
 
