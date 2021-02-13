@@ -17,11 +17,8 @@ print(datetime.datetime.strptime('February 12, 2021', '%B %d, %Y').strftime('%a'
 
 ##### Variables:
 
-finished_music = False
-is_connected = False
 current_song = ''
 queue = []
-news_queue = []
 songs = -1
 client = commands.Bot(command_prefix='$')  # Define the client
 
@@ -66,7 +63,8 @@ class YTDLSource(discord.PCMVolumeTransformer):
         filename = data['url'] if stream else ytdl.prepare_filename(data)
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
-class Music:
+## Class
+class Video:
   def __init__(self, title, duration, link):
     self.title = title
     self.duration = duration
@@ -82,7 +80,7 @@ async def check_queue(ctx):
     del queue[0]
     await play_music(ctx, video.title)
 
-async def search_music (search):
+async def get_url_video (search):
     global queue
     query_string = urllib.parse.urlencode({
         'search_query': search
@@ -95,12 +93,11 @@ async def search_music (search):
     search_results = re.findall(
         r'/watch\?v=(.{11})', htm_content.read().decode())
 
-    return search_results[0]
+    return 'http://www.youtube.com/watch?v=' + search_results[0]
 
 ## Method for play music from Youtube
 async def play_music(ctx, search):
     global current_song
-    global is_connected
 
     channel = ctx.message.author.voice.channel
     voiceChannel = discord.utils.get(ctx.guild.voice_channels, name=str(channel))
@@ -110,16 +107,13 @@ async def play_music(ctx, search):
         await voiceChannel.connect()
         voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
 
-    '''player = await YTDLSource.from_url(search_results[0])'''
-
-    result = await search_music(search)
-    player = await YTDLSource.from_url(result)
+    url_video = await get_url_video(search)
+    player = await YTDLSource.from_url(url_video)
     current_song = player.title
     
     video_minutes = str(datetime.timedelta(seconds=player.duration))
-    video_link = 'http://www.youtube.com/watch?v=' + result
-
-    await ctx.send('**Now playing:** ' + '\n' + 'Title: ' + player.title + '\n' + 'Duration: ' + video_minutes + '\n' + 'Link: ' + video_link)
+    
+    await ctx.send('**Now playing:** ' + '\n' + 'Title: ' + player.title + '\n' + 'Duration: ' + video_minutes + '\n' + 'Link: ' + url_video)
 
     voice.play(player)
     
@@ -149,9 +143,9 @@ async def play(ctx, *, search):
     else:
         if voice.is_playing():
             songs += 1
-            result = await search_music(search)
+            result = await get_url_video (search)
             player = await YTDLSource.from_url(result)
-            queue.append(Music(player.title, player.duration,  'http://www.youtube.com/watch?v=' + result))
+            queue.append(Video(player.title, player.duration,  'http://www.youtube.com/watch?v=' + result))
             return
 
 ## Show all commands
@@ -160,7 +154,7 @@ async def commands(ctx):
     string = '```All commands:' + '\n\n-- About Music--' + '\n\n' + '$play "music": play the music' + '\n' + '$pause: pause the music' + '\n' + '$resume: continue the music' + '\n' + \
     '$skip: play next music in queue' + '\n' + '$leave: disconnect the bot' + '\n' + \
     '$show_queue: show all musics in queue' + '\n$now: show the current music' \
-    '\n\n' + '-- About School --' + '\n\n' + '$school_schedules: show school schedules```'
+    '\n\n' + '-- About School --' + '\n\n' + '$schedules: show school schedules```'
 
     await ctx.send(string)
 
@@ -171,7 +165,7 @@ async def leave(ctx):
     if voice.is_connected():
         await voice.disconnect()
     else:
-        await ctx.send('The bot is not connected to a voie channel')
+        await ctx.send('The bot is not connected to a voie channel!')
 
 ## Pause the music from Yotube
 @client.command()
@@ -180,7 +174,7 @@ async def pause(ctx):
     if voice.is_playing():
         voice.pause()
     else:
-        await ctx.send('No audio is playing')
+        await ctx.send('No audio is playing!')
 
 ## Play next music in queue
 @client.command()
@@ -194,7 +188,7 @@ async def skip(ctx):
         del queue[0]
         songs -= 1
     else:
-        await ctx.send('There not more musics')
+        await ctx.send('There not more musics!')
 
 ## Resume the music from Youtube
 @client.command()
@@ -203,7 +197,7 @@ async def resume(ctx):
     if voice.is_paused():
         voice.resume()
     else:
-        await ctx.send('The audio is not paused')
+        await ctx.send('The audio is not paused!')
 
 ## Show the queue
 @client.command()
@@ -211,14 +205,15 @@ async def show_queue(ctx):
     global queue
     string = '**Musics in queue:**' + '\n' + '\n'
 
+    index = 1
     if len(queue) != 0:
         for music in queue:
             video_minutes = str(datetime.timedelta(seconds=music.duration))
-            string += 'Title: ' + music.title + '\n' + 'Duration: ' + video_minutes + '\n' + 'Link: ' + music.link + '\n' + '------------------------------------------------------------------' + '\n'
+            string += str(index) + 'º - Title: ' + music.title + '\n' + 'Duration: ' + video_minutes + '\n\n'
+            index += 1
     else:
-        string = 'There not queue'
+        string = 'There not queue!'
 
-    string = '```' + string + '```'
     await ctx.send(string)
 
 ## Show the current song
@@ -230,7 +225,7 @@ async def now(ctx):
 
 ## Show the school schedules
 @client.command()
-async def school_schedules(ctx):
+async def schedules(ctx):
     await ctx.send(file=discord.File('school_schedules.png'))
 
 keep_alive()  # Client keep alive
