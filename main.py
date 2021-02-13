@@ -17,6 +17,7 @@ print(datetime.datetime.strptime('February 12, 2021', '%B %d, %Y').strftime('%a'
 
 ##### Variables:
 
+finished_music = False
 is_connected = False
 current_song = ''
 queue = []
@@ -73,7 +74,16 @@ class Music:
 
 ##### Methods:
 
+async def check_queue(ctx):
+  global queue
+
+  if len(queue) != 0:
+    video = queue[0]
+    del queue[0]
+    await play_music(ctx, video.title)
+
 async def search_music (search):
+    global queue
     query_string = urllib.parse.urlencode({
         'search_query': search
     })
@@ -92,17 +102,6 @@ async def play_music(ctx, search):
     global current_song
     global is_connected
 
-    '''query_string = urllib.parse.urlencode({
-        'search_query': search
-    })
-
-    htm_content = urllib.request.urlopen(
-        'http://www.youtube.com/results?' + query_string
-    )
-
-    search_results = re.findall(
-        r'/watch\?v=(.{11})', htm_content.read().decode())'''
-
     channel = ctx.message.author.voice.channel
     voiceChannel = discord.utils.get(ctx.guild.voice_channels, name=str(channel))
     voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
@@ -116,14 +115,20 @@ async def play_music(ctx, search):
     result = await search_music(search)
     player = await YTDLSource.from_url(result)
     current_song = player.title
-    voice.play(player, after=lambda e: print(
-        'Player error: %s' % e) if e else None)
-
+    
     video_minutes = str(datetime.timedelta(seconds=player.duration))
     video_link = 'http://www.youtube.com/watch?v=' + result
+
     await ctx.send('**Now playing:** ' + '\n' + 'Title: ' + player.title + '\n' + 'Duration: ' + video_minutes + '\n' + 'Link: ' + video_link)
 
+    voice.play(player)
+    
+    while voice.is_playing():
+      await asyncio.sleep(1)
 
+    await check_queue(ctx)
+  
+     
 ##### Commands:
 
 ## Play music from Youtube
@@ -204,8 +209,7 @@ async def resume(ctx):
 @client.command()
 async def show_queue(ctx):
     global queue
-    index = 1
-    string = 'Musics in queue:' + '\n' + '\n'
+    string = '**Musics in queue:**' + '\n' + '\n'
 
     if len(queue) != 0:
         for music in queue:
