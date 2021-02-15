@@ -1,0 +1,17 @@
+```-- About Video--
+
+$play "video name": play the video
+$pause: pause the video
+$resume: continue the video
+$skip: play next video in queue
+$leave: disconnect the bot
+$show_queue: show all videos in queue
+$now: show the current video
+
+-- About School --
+
+$schedules: show school schedules
+
+-- About Joke -- 
+
+$joke: show a joke```

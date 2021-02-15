@@ -1,134 +1,35 @@
-##### Libraries
+## Import - Libraries
 import discord
+import datetime
 import os
 from discord.ext import commands, tasks
-import urllib.parse
-import urllib.request
-import re
 from keep_alive import keep_alive
-import youtube_dl
 import asyncio
+import requests
+import json
+from googleapiclient.discovery import build
 
+## Import - Class
+from ClassroomScraping.Credentials import authorization
+from ClassroomScraping.ClassroomRepository import ClassroomRepository
+from YTDLSource import YTDLSource
+from Video import Video
+from VideoPlayer import VideoPlayer
+from DiscordActions import DiscordActions
 
-##### Tests
-import datetime
-print(datetime.datetime.strptime('February 12, 2021', '%B %d, %Y').strftime('%a'))
+## Variables:
 
-
-##### Variables:
-
-current_song = ''
 queue = []
-songs = -1
+current_song = ''
+# queue = []
 client = commands.Bot(command_prefix='$')  # Define the client
 
-ytdl_format_options = {
-    'format': 'bestaudio/best',
-    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
-    'restrictfilenames': True,
-    'noplaylist': True,
-    'nocheckcertificate': True,
-    'ignoreerrors': False,
-    'logtostderr': False,
-    'quiet': True,
-    'no_warnings': True,
-    'default_search': 'auto',
-    'source_address': '0.0.0.0'
-}
-
-ffmpeg_options = {
-    'options': '-vn'
-}
-
-ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
-
-## Class
-class YTDLSource(discord.PCMVolumeTransformer):
-    def __init__(self, source, *, data, volume=0.5):
-        super().__init__(source, volume)
-
-        self.data = data
-        self.title = data.get('title')
-        self.duration = data.get('duration')
-        self.url = data.get('url')
-
-    @classmethod
-    async def from_url(cls, url, *, loop=None, stream=False):
-        loop = loop or asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
-
-        if 'entries' in data:
-            data = data['entries'][0]
-
-        filename = data['url'] if stream else ytdl.prepare_filename(data)
-        return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
-
-## Class
-class Video:
-  def __init__(self, title, duration, link):
-    self.title = title
-    self.duration = duration
-    self.link = link
-
-##### Methods:
-
-async def check_queue(ctx):
-  global queue
-
-  if len(queue) != 0:
-    video = queue[0]
-    del queue[0]
-    await play_music(ctx, video.title)
-
-async def get_url_video (search):
-    global queue
-    query_string = urllib.parse.urlencode({
-        'search_query': search
-    })
-
-    htm_content = urllib.request.urlopen(
-        'http://www.youtube.com/results?' + query_string
-    )
-
-    search_results = re.findall(
-        r'/watch\?v=(.{11})', htm_content.read().decode())
-
-    return 'http://www.youtube.com/watch?v=' + search_results[0]
-
-## Method for play music from Youtube
-async def play_music(ctx, search):
-    global current_song
-
-    channel = ctx.message.author.voice.channel
-    voiceChannel = discord.utils.get(ctx.guild.voice_channels, name=str(channel))
-    voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
-
-    if voice is None:
-        await voiceChannel.connect()
-        voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
-
-    url_video = await get_url_video(search)
-    player = await YTDLSource.from_url(url_video)
-    current_song = player.title
-    
-    video_minutes = str(datetime.timedelta(seconds=player.duration))
-    
-    await ctx.send('**Now playing:** ' + '\n' + 'Title: ' + player.title + '\n' + 'Duration: ' + video_minutes + '\n' + 'Link: ' + url_video)
-
-    voice.play(player)
-    
-    while voice.is_playing():
-      await asyncio.sleep(1)
-
-    await check_queue(ctx)
-  
-     
 ##### Commands:
 
 ## Play music from Youtube
 @client.command()
 async def play(ctx, *, search):
-    global songs
+    global queue
 
     author_voice = ctx.message.author.voice
 
@@ -136,33 +37,35 @@ async def play(ctx, *, search):
         await ctx.send('Join a channel!')
         return
 
-    voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
-
-    if voice is None:
-        await play_music(ctx, search)
+    if not DiscordActions.is_connected(ctx):
+        await VideoPlayer.play_music(VideoPlayer, ctx, client, search, queue)
     else:
+        voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
         if voice.is_playing():
-            songs += 1
-            result = await get_url_video (search)
+            result = await YTDLSource.get_url_video (search)
             player = await YTDLSource.from_url(result)
             queue.append(Video(player.title, player.duration,  'http://www.youtube.com/watch?v=' + result))
             return
+        else:
+            await VideoPlayer.play_music(VideoPlayer, ctx, client, search, queue)
 
 ## Show all commands
 @client.command()
 async def commands(ctx):
-    string = '```All commands:' + '\n\n-- About Music--' + '\n\n' + '$play "music": play the music' + '\n' + '$pause: pause the music' + '\n' + '$resume: continue the music' + '\n' + \
-    '$skip: play next music in queue' + '\n' + '$leave: disconnect the bot' + '\n' + \
-    '$show_queue: show all musics in queue' + '\n$now: show the current music' \
-    '\n\n' + '-- About School --' + '\n\n' + '$schedules: show school schedules```'
+  f = open('commands.txt', 'r')
+  string = f.read()
 
-    await ctx.send(string)
+  await ctx.send(string)
 
 ## Disconnect client
 @client.command()
 async def leave(ctx):
+    global queue
+
     voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
-    if voice.is_connected():
+
+    queue.clear()
+    if DiscordActions.is_connected(ctx):
         await voice.disconnect()
     else:
         await ctx.send('The bot is not connected to a voie channel!')
@@ -179,14 +82,16 @@ async def pause(ctx):
 ## Play next music in queue
 @client.command()
 async def skip(ctx):
-    global songs
 
     if len(queue) != 0:
         voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
         voice.pause()
-        await play_music(ctx, queue[0])
+
+        while voice.is_playing():
+          await asyncio.sleep(1)
+
+        await VideoPlayer.play_music(VideoPlayer, ctx, client, queue[0], queue)
         del queue[0]
-        songs -= 1
     else:
         await ctx.send('There not more musics!')
 
@@ -202,14 +107,14 @@ async def resume(ctx):
 ## Show the queue
 @client.command()
 async def show_queue(ctx):
-    global queue
+    # global queue
     string = '**Musics in queue:**' + '\n' + '\n'
 
     index = 1
     if len(queue) != 0:
-        for music in queue:
-            video_minutes = str(datetime.timedelta(seconds=music.duration))
-            string += str(index) + 'º - Title: ' + music.title + '\n' + 'Duration: ' + video_minutes + '\n\n'
+        for video in queue:
+            video_minutes = str(datetime.timedelta(seconds=video.duration))
+            string += str(index) + 'º - Title: ' + video.title + '\n' + 'Duration: ' + video_minutes + '\n\n'
             index += 1
     else:
         string = 'There not queue!'
@@ -228,5 +133,69 @@ async def now(ctx):
 async def schedules(ctx):
     await ctx.send(file=discord.File('school_schedules.png'))
 
+## Show announcements 
+async def show_new_announcements():
+  auth = authorization() 
+  service = build('classroom', 'v1', credentials=auth.credentials)
+
+  course_announcements = ClassroomRepository.new_announcements_account(service, datetime.datetime.today().now())
+    
+  channel = client.get_channel(810592759542448138)
+  if len (course_announcements) != 0:
+    await channel.send('@everyone')
+    await channel.send('\n**There are new announcements:**\n\n\n\n')
+  else:
+    return
+
+  for course_announcement in course_announcements:
+    course = ClassroomRepository.get_course(service, course_announcement['courseId'])
+    
+    await channel.send('```Turma: ' + course['name'] + '\n\n' + course_announcement['text'] + '\n\n' + course['alternateLink'] + '```')
+
+## Show news works
+async def show_new_works():
+  auth = authorization() 
+  service = build('classroom', 'v1', credentials=auth.credentials)
+
+  course_works = ClassroomRepository.new_works_account(service, datetime.datetime.now())
+
+  channel = client.get_channel(810592759542448138)
+  if len (course_works) != 0:
+    await channel.send('@everyone')
+    await channel.send('\n**There are new works:**\n\n\n\n')
+  else:
+    return
+
+  for course_work in course_works:
+    course = ClassroomRepository.get_course(service, course_work['courseId'])
+
+    description = 'none'
+
+    if 'description' in course_work:
+      description = course_work['description']
+
+    await channel.send('```Turma: ' + course['name'] + '\n\n' 'Title: '+ course_work['title'] + '\nDescription: ' + description + '\n' + course_work['alternateLink'] + '```')
+
+@tasks.loop(minutes=30)
+async def called_once_a_day():
+    await show_new_announcements()
+    await show_new_works()
+    
+@called_once_a_day.before_loop
+async def before():
+    await client.wait_until_ready()
+
+## Show a joke
+@client.command()
+async def joke (ctx):
+  r = requests.get('https://api-charada.herokuapp.com/puzzle?lang=ptbr')
+  json_string = json.dumps(r.json())
+  dict_data = json.loads(json_string)
+  
+  await ctx.send('**A joke**: ' + '\n\nQuestion: ' + dict_data['question'] + '\nAnswer: ' + dict_data['answer'])
+
+## Run
+
+called_once_a_day.start() # Loop
 keep_alive()  # Client keep alive
 client.run(os.getenv('TOKEN'))  # Run the client
