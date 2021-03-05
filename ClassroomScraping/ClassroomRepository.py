@@ -41,7 +41,7 @@ class ClassroomRepository:
                     announcement_date_time = datetime.datetime.strptime(
                         date_time_str, '%Y-%m-%dT%H:%M:%S.%fZ')
 
-                    one_time = datetime.timedelta(minutes=30)
+                    one_time = datetime.timedelta(minutes=1)
                     if (announcement_date_time < now_time - one_time):
                         break
 
@@ -70,7 +70,7 @@ class ClassroomRepository:
                 work_date_time = datetime.datetime.strptime(
                 date_time_str, '%Y-%m-%dT%H:%M:%S.%fZ')
 
-                one_time = datetime.timedelta(minutes=30)
+                one_time = datetime.timedelta(minutes=1)
                 if (work_date_time < now_time - one_time):
                     break
                 
@@ -88,3 +88,47 @@ class ClassroomRepository:
             announcements_account.extend(new_works)
 
         return announcements_account
+
+    @staticmethod
+    def materials_course(service, id_course, max_announcements=0):
+        result = service.courses().courseWorkMaterials().list(
+            courseId=id_course, pageSize=max_announcements).execute()
+        materials = result.get('courseWorkMaterial', [])
+
+        return materials
+
+    @staticmethod
+    def new_materials_course(service, id_course, now_time, max_couse=0):
+        course_materials = ClassroomRepository.materials_course(
+                service, id_course, 3)
+
+        new_material_curse = []
+        if (len(course_materials) != 0):
+            for material in course_materials:
+                date_time_str = material['updateTime']
+                work_date_time = datetime.datetime.strptime(
+                date_time_str, '%Y-%m-%dT%H:%M:%S.%fZ')
+
+                one_time = datetime.timedelta(minutes=1)
+                if (work_date_time < now_time - one_time):
+                    break
+                
+                new_material_curse.append(material)
+
+        return new_material_curse
+
+    @staticmethod
+    def new_materials_account (service, now_time):
+        courses = ClassroomRepository.get_courses(service)
+
+        materials_account = []
+        for course in courses:
+            new_works = ClassroomRepository.new_materials_course(service, course['id'], now_time, 3)
+            materials_account.extend(new_works)
+
+        return materials_account
+
+    def get_teacher(service, course_id, teacher_id):
+        result = service.courses().teachers().get(courseId=course_id, userId=teacher_id).execute()
+
+        return result
