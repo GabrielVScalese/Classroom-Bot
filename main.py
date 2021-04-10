@@ -12,126 +12,9 @@ from googleapiclient.discovery import build
 ## Import - Class
 from ClassroomScraping.Credentials import authorization
 from ClassroomScraping.ClassroomRepository import ClassroomRepository
-from YTDLSource import YTDLSource
-from Video import Video
-from VideoPlayer import VideoPlayer
-from DiscordActions import DiscordActions
 
-## Variables:
-queue = []
-current_song = ''
-# queue = []
 client = commands.Bot(command_prefix='$')  # Define the client
 channel_id = 817054317294387300
-
-##### Commands:
-
-## Play music from Youtube
-@client.command()
-async def play(ctx, *, search):
-    global queue
-
-    author_voice = ctx.message.author.voice
-
-    if not author_voice:
-        await ctx.send('Join a channel!')
-        return
-
-    if not DiscordActions.is_connected(ctx):
-        await VideoPlayer.play_music(VideoPlayer, ctx, client, search, queue)
-    else:
-        voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
-        if voice.is_playing():
-            result = await YTDLSource.get_url_video (search)
-            player = await YTDLSource.from_url(result)
-            queue.append(Video(player.title, player.duration,  'http://www.youtube.com/watch?v=' + result))
-            return
-        else:
-            await VideoPlayer.play_music(VideoPlayer, ctx, client, search, queue)
-
-## Show all commands
-@client.command()
-async def commands(ctx):
-  f = open('commands.txt', 'r')
-  string = f.read()
-
-  await ctx.send(string)
-
-## Disconnect client
-@client.command()
-async def leave(ctx):
-    global queue
-
-    voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
-
-    queue.clear()
-    if DiscordActions.is_connected(ctx):
-        await voice.disconnect()
-    else:
-        await ctx.send('The bot is not connected to a voie channel!')
-
-## Pause the music from Yotube
-@client.command()
-async def pause(ctx):
-    voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
-    if voice.is_playing():
-        voice.pause()
-    else:
-        await ctx.send('No audio is playing!')
-
-## Play next music in queue
-@client.command()
-async def skip(ctx):
-
-    if len(queue) != 0:
-        voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
-        voice.pause()
-
-        while voice.is_playing():
-          await asyncio.sleep(1)
-
-        await VideoPlayer.play_music(VideoPlayer, ctx, client, queue[0], queue)
-        del queue[0]
-    else:
-        await ctx.send('There not more musics!')
-
-## Resume the music from Youtube
-@client.command()
-async def resume(ctx):
-    voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
-    if voice.is_paused():
-        voice.resume()
-    else:
-        await ctx.send('The audio is not paused!')
-
-## Show the queue
-@client.command()
-async def show_queue(ctx):
-    # global queue
-    string = '**Musics in queue:**' + '\n' + '\n'
-
-    index = 1
-    if len(queue) != 0:
-        for video in queue:
-            video_minutes = str(datetime.timedelta(seconds=video.duration))
-            string += str(index) + 'º - Title: ' + video.title + '\n' + 'Duration: ' + video_minutes + '\n\n'
-            index += 1
-    else:
-        string = 'There not queue!'
-
-    await ctx.send(string)
-
-## Show the current song
-@client.command()
-async def now(ctx):
-  global current_song
-
-  await ctx.send('****Is playing:**** ' + current_song)
-
-## Show the school schedules
-@client.command()
-async def schedules(ctx):
-    await ctx.send(file=discord.File('school_schedules.png'))
 
 ## Show announcements 
 async def show_new_announcements():
@@ -154,9 +37,18 @@ async def show_new_announcements():
 
     description = ' '.join([str(elem) for elem in description])
 
-    embed = discord.Embed(title=course['name'], url= course_announcement['alternateLink'], description=description, color=discord.Color.blue())
+    embed = discord.Embed(title=course['name'][:256], url= course_announcement['alternateLink'], description=description, color=discord.Color.blue())
 
-    await channel.send(embed=embed)
+    try:
+      teacher = ClassroomRepository.get_teacher(service, course_announcement["courseId"], course_announcement['creatorUserId'])
+      embed.set_author(name=teacher["profile"]["name"]["fullName"][:256],  icon_url="https:" + teacher["profile"]["photoUrl"])
+
+      await channel.send(embed=embed)
+    except:
+      teacher = ClassroomRepository.get_teacher(service, course_announcement["courseId"], course_announcement['creatorUserId'])
+      embed.set_author(name=teacher["profile"]["name"]["fullName"][:256],  icon_url=teacher["profile"]["photoUrl"])
+
+      await channel.send(embed=embed)
 
 ## Show news works
 async def show_new_works():
@@ -182,13 +74,15 @@ async def show_new_works():
 
       description = ' '.join([str(elem) for elem in description])
 
-    embed = discord.Embed(title=course_work['title'], url=course_work['alternateLink'], description=description, color=discord.Color.blue())
+    embed = discord.Embed(title=course_work['title'][:256], url=course_work['alternateLink'], description=description, color=discord.Color.blue())
     
     try:
       embed.set_author(name=course['name'],  icon_url="https:" + ClassroomRepository.get_teacher(service, course_work["courseId"], course_work['creatorUserId'])["profile"]["photoUrl"])
 
       await channel.send(embed=embed)
+      
     except:
+      
       embed.set_author(name=course['name'],  icon_url= ClassroomRepository.get_teacher(service, course_work["courseId"], course_work['creatorUserId'])["profile"]["photoUrl"])
 
       await channel.send(embed=embed)
@@ -217,7 +111,7 @@ async def show_new_materials():
 
       description = ' '.join([str(elem) for elem in description])
 
-    embed = discord.Embed(title=course_material['title'], url=course_material['alternateLink'], description=description, color=discord.Color.blue())
+    embed = discord.Embed(title=course_material['title'][:256], url=course_material['alternateLink'], description=description, color=discord.Color.blue())
 
     try:
       embed.set_author(name=course['name'],  icon_url="https:" + ClassroomRepository.get_teacher(service, course_material["courseId"], course_material['creatorUserId'])["profile"]["photoUrl"])
@@ -237,15 +131,6 @@ async def called_once_a_day():
 @called_once_a_day.before_loop
 async def before():
     await client.wait_until_ready()
-
-## Show a joke
-@client.command()
-async def joke (ctx):
-  r = requests.get('https://api-charada.herokuapp.com/puzzle?lang=ptbr')
-  json_string = json.dumps(r.json())
-  dict_data = json.loads(json_string)
-  
-  await ctx.send('**A joke**: ' + '\n\nQuestion: ' + dict_data['question'] + '\nAnswer: ' + dict_data['answer'])
 
 ## Run
 called_once_a_day.start() # Loop
