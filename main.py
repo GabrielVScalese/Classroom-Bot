@@ -9,14 +9,14 @@ import requests
 import json
 from googleapiclient.discovery import build
 
-## Import - Class
+
 from ClassroomScraping.Credentials import authorization
 from ClassroomScraping.ClassroomRepository import ClassroomRepository
 
-client = commands.Bot(command_prefix='$')  # Define the client
+client = commands.Bot(command_prefix='$') 
 channel_id = 817054317294387300
 
-## Show announcements 
+
 async def show_new_announcements():
   auth = authorization() 
   service = build('classroom', 'v1', credentials=auth.credentials)
@@ -50,7 +50,7 @@ async def show_new_announcements():
 
       await channel.send(embed=embed)
 
-## Show news works
+
 async def show_new_works():
   auth = authorization() 
   service = build('classroom', 'v1', credentials=auth.credentials)
@@ -87,7 +87,7 @@ async def show_new_works():
 
       await channel.send(embed=embed)
 
-## Show news materials
+
 async def show_new_materials():
   auth = authorization() 
   service = build('classroom', 'v1', credentials=auth.credentials)
@@ -132,7 +132,7 @@ async def called_once_a_day():
 async def before():
     await client.wait_until_ready()
 
-## Run
-called_once_a_day.start() # Loop
-keep_alive()  # Client keep alive
-client.run(os.getenv('TOKEN'))  # Run the client
+
+called_once_a_day.start()
+keep_alive()  
+client.run(os.getenv('TOKEN')) 
